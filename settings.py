@@ -15,11 +15,19 @@ DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 # Thêm tên miền Heroku của bạn vào đây sau khi tạo app
 # Ví dụ: ALLOWED_HOSTS = ['ten-app-cua-ban.herokuapp.com', '127.0.0.1']
-ALLOWED_HOSTS = ['ffst','127.0.0.1']
+ALLOWED_HOSTS = ['ffst.herokuapp.com', '127.0.0.1']
 
 
 # Application definition
-# ...
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    # Thêm dòng này để Django nhận lệnh collectstatic
+    'django.contrib.staticfiles',
+]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -56,4 +64,3 @@ DATABASES = {
 db_from_env = dj_database_url.config(conn_max_age=600, ssl_require=True)
 if db_from_env:
     DATABASES['default'].update(db_from_env)
-
