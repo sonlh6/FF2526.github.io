@@ -8,7 +8,7 @@ def main():
     """Run administrative tasks."""
     # Thay đổi 'your_project_name.settings' thành tên dự án của bạn.
     # Dựa trên cấu trúc file của bạn, tên dự án có vẻ là 'Fantasy'.
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'Fantasy.settings')
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'settings')
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:
