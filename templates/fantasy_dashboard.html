@@ -799,38 +799,45 @@
         // Hàm gọi API backend để thêm hàng loạt manager
         async function addManagersInBulk(ids) {
             showLoading();
-            try {
-                const response = await fetch('/api/add-manager', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ manager_ids: ids })
-                });
+            let successCount = 0;
+            let failedIds = [];
 
-                const result = await response.json();
-                hideLoading();
+            // Use Promise.all to send requests in parallel for better performance
+            const promises = ids.map(async (id) => {
+                try {
+                    // Ensure the manager doesn't already exist on the client-side
+                    if (managers.some(m => m.id == id)) {
+                        return;
+                    }
 
-                if (response.ok && result.success) {
-                    // Thêm các manager thành công vào danh sách và giao diện
-                    result.managers.forEach(manager => {
-                        addManagerToList(manager);
+                    const response = await fetch('/api/add-manager', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        // Send 'manager_id' (singular) as the backend seems to expect
+                        body: JSON.stringify({ manager_id: id })
                     });
+                    const result = await response.json();
 
-                    let successCount = result.managers.length;
-                    let failCount = result.failed.length;
-
-                    if (successCount > 0) {
-                        showToast(`Đã thêm thành công ${successCount} manager.`, 'success');
+                    if (response.ok && result.success) {
+                        addManagerToList(result.manager);
+                        successCount++;
+                    } else {
+                        failedIds.push({ id: id, reason: result.error || 'Lỗi không xác định' });
                     }
-                    if (failCount > 0) {
-                        const failedIdsList = result.failed.map(f => `${f.id} (${f.reason})`).join(', ');
-                        showToast(`Thêm thất bại ${failCount} manager: ${failedIdsList}`, 'error', 10000); // Hiển thị thông báo lỗi trong 10 giây
-                    }
-                } else {
-                    showToast(result.error || 'Đã có lỗi xảy ra.', 'error');
+                } catch (error) {
+                    failedIds.push({ id: id, reason: 'Lỗi kết nối' });
                 }
-            } catch (error) {
-                hideLoading();
-                showToast('Lỗi kết nối: ' + error.message, 'error');
+            });
+
+            await Promise.all(promises);
+            hideLoading();
+
+            if (successCount > 0) {
+                showToast(`Đã thêm thành công ${successCount} manager.`, 'success');
+            }
+            if (failedIds.length > 0) {
+                const failedIdsList = failedIds.map(f => `${f.id} (${f.reason})`).join(', ');
+                showToast(`Thêm thất bại ${failedIds.length} manager: ${failedIdsList}`, 'error', 10000);
             }
         }    
         function renderRankingTable() {
