@@ -1,5 +1,6 @@
 from django.shortcuts import render
 from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 import requests
 import json
 
@@ -27,7 +28,7 @@ def test_connection(request):
         })
     except requests.exceptions.RequestException as e:
         return JsonResponse({"success": False, "error": str(e)}, status=502)
-
+@csrf_exempt
 def add_manager(request):
     if request.method == 'POST':
         try:
@@ -91,7 +92,7 @@ def get_manager_stats(request, manager_id):
         return JsonResponse({"success": True, "data": stats})
     except Exception as e:
         return JsonResponse({"success": False, "error": str(e)}, status=500)
-
+@csrf_exempt
 def compare_managers(request):
     if request.method == 'POST':
         try:
@@ -109,7 +110,7 @@ def compare_managers(request):
         except Exception as e:
             return JsonResponse({"success": False, "error": str(e)}, status=500)
     return JsonResponse({"success": False, "error": "Invalid request method"}, status=405)
-
+@csrf_exempt
 def remove_manager(request, manager_id):
     return JsonResponse({"success": True, "message": f"Manager {manager_id} removal acknowledged."})
 
