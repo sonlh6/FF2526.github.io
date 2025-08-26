@@ -314,24 +314,13 @@
         // Initialize app
         document.addEventListener('DOMContentLoaded', function() {
             checkConnection();
-            updateManagerCount();
-
-            // Show comparison section if we already have managers
-            if (managers.length > 0) {
-                document.getElementById('comparisonSection').style.display = 'block';
-            }
-            
-            // Enter key support
-            document.getElementById('managerIdInput').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    addManager();
-                }
-            });
+            // Load managers from client-side storage on startup
+            loadInitialManagers();
         });
 
         function saveManagersToStorage() {
-            const managerIds = managers.map(m => m.id);
-            localStorage.setItem('fantasyManagerIds', JSON.stringify(managerIds));
+            // Store the full manager objects for faster loading, avoiding API calls on page refresh.
+            localStorage.setItem('fantasyManagers', JSON.stringify(managers));
         }
 
         function showLoading() {
@@ -376,96 +365,31 @@
             }
         }
 
-        async function addManager() {
-            const managerIdInput = document.getElementById('managerIdInput');
-            const managerId = parseInt(managerIdInput.value);
-
-            if (!managerId || managerId <= 0) {
-                showToast('Vui lòng nhập Manager ID hợp lệ', 'error');
-                return;
-            }
-
+        function addManagerToList(manager) {
             // Check if manager already exists
-            if (managers.find(m => m.id === managerId)) {
-                showToast('Manager này đã được thêm rồi!', 'error');
+            if (managers.some(m => m.id === manager.id)) {
                 return;
             }
 
-            showLoading();
+            managers.push(manager);
+            updateManagersList();
+            saveManagersToStorage();
+            loadManagerStats(manager.id);
+            updateManagerCount();
 
-            try {
-                const response = await fetch('/api/add-manager', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ manager_id: managerId })
-                });
-
-                const result = await response.json();
-                hideLoading();
-
-                if (result.success) {
-                    managers.push(result.manager);
-                    managerIdInput.value = '';
-                    showToast(`Đã thêm ${result.manager.name} (${result.manager.team_name})`, 'success');
-                    
-                    updateManagersList();
-                    saveManagersToStorage();
-                    loadManagerStats(managerId);
-                    updateManagerCount();
-                    
-                    if (managers.length > 0) {
-                        document.getElementById('comparisonSection').style.display = 'block';
-                    }
-                } else {
-                    showToast(result.error, 'error');
-                }
-            } catch (error) {
-                hideLoading();
-                showToast('Lỗi kết nối: ' + error.message, 'error');
+            if (managers.length > 0) {
+                document.getElementById('comparisonSection').style.display = 'block';
             }
         }
 
         async function loadInitialManagers() {
-            const storedIdsJSON = localStorage.getItem('fantasyManagerIds');
-            if (storedIdsJSON) {
-                const managerIds = JSON.parse(storedIdsJSON);
-                if (Array.isArray(managerIds) && managerIds.length > 0) {
-                    showLoading();
-                    try {
-                        const addManagerPromises = managerIds.map(id =>
-                            fetch('/api/add-manager', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ manager_id: id })
-                            }).then(res => res.json())
-                        );
-                        const addResults = await Promise.all(addManagerPromises);
-
-                        addResults.forEach(result => {
-                            if (result.success && !managers.some(m => m.id === result.manager.id)) {
-                                managers.push(result.manager);
-                            } else if (!result.success) {
-                                console.error(`Lỗi khi tải lại manager: ${result.error}`);
-                            }
-                        });
-
-                        if (managers.length > 0) {
-                            updateManagersList();
-                            updateManagerCount();
-                            document.getElementById('comparisonSection').style.display = 'block';
-
-                            const statsPromises = managers.map(manager =>
-                                fetchManagerStatsData(manager.id).then(stats => {
-                                    if (stats) displayManagerStats(manager.id, stats);
-                                })
-                            );
-                            await Promise.all(statsPromises);
-                        }
-                    } catch (error) {
-                        showToast('Lỗi khi tải dữ liệu ban đầu: ' + error.message, 'error');
-                    } finally {
-                        hideLoading();
-                    }
+            const storedManagersJSON = localStorage.getItem('fantasyManagers');
+            if (storedManagersJSON) {
+                managers = JSON.parse(storedManagersJSON);
+                if (managers.length > 0) {
+                    updateManagersList();
+                    updateManagerCount();
+                    document.getElementById('comparisonSection').style.display = 'block';
                 }
             }
         }
@@ -553,18 +477,14 @@
             if (!confirm('Bạn có chắc muốn xóa tất cả managers?')) return;
             if (managers.length === 0) return;
 
-            // Clear client-side state immediately for better UX
             managers = [];
-            localStorage.removeItem('fantasyManagerIds');
+            localStorage.removeItem('fantasyManagers');
             updateManagersList();
             updateManagerCount();
             document.getElementById('managerStatsContainer').innerHTML = '';
             document.getElementById('comparisonSection').style.display = 'none';
             document.getElementById('comparisonCharts').innerHTML = '';
             showToast('Đã xóa tất cả managers', 'success');
-
-            // Note: This assumes the backend session is temporary or non-existent.
-            // If the backend had persistent storage, you'd need an API call here.
         }
 
         async function fetchManagerStatsData(managerId) {
@@ -892,7 +812,7 @@
                 if (response.ok && result.success) {
                     // Thêm các manager thành công vào danh sách và giao diện
                     result.managers.forEach(manager => {
-                        addManagerToList(manager); // Giả sử bạn đã có hàm này
+                        addManagerToList(manager);
                     });
 
                     let successCount = result.managers.length;
