@@ -15,11 +15,20 @@ DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 # Thêm tên miền Heroku của bạn vào đây sau khi tạo app
 # Ví dụ: ALLOWED_HOSTS = ['ten-app-cua-ban.herokuapp.com', '127.0.0.1']
+ALLOWED_HOSTS = ['ffst','127.0.0.1']
 ALLOWED_HOSTS = ['ffst-f49f926a4e62.herokuapp.com', '127.0.0.1']
 
 
 # Application definition
-# ...
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',   # ✅ phải có dòng này
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    # app của bạn
+]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
