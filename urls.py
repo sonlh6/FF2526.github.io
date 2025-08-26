@@ -1,15 +1,11 @@
-from django.urls import path
+from django.urls import path, include
 import views
 
+
 urlpatterns = [
-    # Frontend View
+    # View để hiển thị trang chính
     path('', views.dashboard_view, name='dashboard'),
 
-    # API Endpoints
-    path('api/test-connection', views.test_connection, name='api_test_connection'),
-    path('api/add-manager', views.add_manager, name='api_add_manager'),
-    path('api/manager/<int:manager_id>/stats', views.get_manager_stats, name='api_get_manager_stats'),
-    path('api/compare-managers', views.compare_managers, name='api_compare_managers'),
-    path('api/remove-manager/<int:manager_id>', views.remove_manager, name='api_remove_manager'),
+    # Tất cả các API endpoint sẽ được quản lý bởi app 'api'
+    path('api/', include('api.urls', namespace='api')),
 ]
-

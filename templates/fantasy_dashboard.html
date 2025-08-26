@@ -236,7 +236,20 @@
         </div>
 
         <!-- Manager List -->
-        <div id="managersList" class="mb-4"></div>
+        <div id="managersList" class="mb-4">
+            {% if managers %}
+            <div class="manager-input-section fade-in">
+                <h4 class="mb-3"><i class="bi bi-people"></i> Danh Sách Managers</h4>
+                <div class="row">
+                    {% for manager in managers %}
+                    <div class="col-lg-4 col-md-6 mb-3" id="manager-list-item-{{ manager.id }}">
+                        {% include 'partials/manager_list_item.html' with manager=manager %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
 
         <!-- Comparison Section -->
         <div class="comparison-section" id="comparisonSection" style="display: none;">
@@ -274,7 +287,16 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-        let managers = [];
+        // Initialize managers array from data passed by Django
+        let managers = [
+            {% for manager in managers %}
+                {
+                    id: {{ manager.id }},
+                    name: "{{ manager.name|escapejs }}",
+                    team_name: "{{ manager.team_name|escapejs }}"
+                },
+            {% endfor %}
+        ];
         let charts = {};
         let processedComparisonData = [];
         let reversedWeeklyScores = [];
@@ -286,7 +308,12 @@
         // Initialize app
         document.addEventListener('DOMContentLoaded', function() {
             checkConnection();
-            loadInitialManagers();
+            updateManagerCount();
+
+            // Show comparison section if we already have managers
+            if (managers.length > 0) {
+                document.getElementById('comparisonSection').style.display = 'block';
+            }
             
             // Enter key support
             document.getElementById('managerIdInput').addEventListener('keypress', function(e) {
@@ -295,11 +322,6 @@
                 }
             });
         });
-
-        function saveManagersToStorage() {
-            const managerIds = managers.map(m => m.id);
-            localStorage.setItem('fantasyManagerIds', JSON.stringify(managerIds));
-        }
 
         function showLoading() {
             document.getElementById('loadingOverlay').style.display = 'flex';
@@ -362,21 +384,19 @@
 
             try {
                 const response = await fetch('/api/add-manager', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    method: 'POST', // CSRF handled by @csrf_exempt in Django view
                     body: JSON.stringify({ manager_id: managerId })
                 });
 
                 const result = await response.json();
                 hideLoading();
-
+                
                 if (result.success) {
                     managers.push(result.manager);
                     managerIdInput.value = '';
                     showToast(`Đã thêm ${result.manager.name} (${result.manager.team_name})`, 'success');
                     
                     updateManagersList();
-                    saveManagersToStorage();
                     loadManagerStats(managerId);
                     updateManagerCount();
                     
@@ -392,51 +412,6 @@
             }
         }
 
-        async function loadInitialManagers() {
-            const storedIdsJSON = localStorage.getItem('fantasyManagerIds');
-            if (storedIdsJSON) {
-                const managerIds = JSON.parse(storedIdsJSON);
-                if (Array.isArray(managerIds) && managerIds.length > 0) {
-                    showLoading();
-                    try {
-                        const addManagerPromises = managerIds.map(id =>
-                            fetch('/api/add-manager', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ manager_id: id })
-                            }).then(res => res.json())
-                        );
-                        const addResults = await Promise.all(addManagerPromises);
-
-                        addResults.forEach(result => {
-                            if (result.success && !managers.some(m => m.id === result.manager.id)) {
-                                managers.push(result.manager);
-                            } else if (!result.success) {
-                                console.error(`Lỗi khi tải lại manager: ${result.error}`);
-                            }
-                        });
-
-                        if (managers.length > 0) {
-                            updateManagersList();
-                            updateManagerCount();
-                            document.getElementById('comparisonSection').style.display = 'block';
-
-                            const statsPromises = managers.map(manager =>
-                                fetchManagerStatsData(manager.id).then(stats => {
-                                    if (stats) displayManagerStats(manager.id, stats);
-                                })
-                            );
-                            await Promise.all(statsPromises);
-                        }
-                    } catch (error) {
-                        showToast('Lỗi khi tải dữ liệu ban đầu: ' + error.message, 'error');
-                    } finally {
-                        hideLoading();
-                    }
-                }
-            }
-        }
-
         function updateManagersList() {
             const container = document.getElementById('managersList');
             
@@ -444,38 +419,21 @@
                 container.innerHTML = '';
                 return;
             }
-
-            container.innerHTML = `
-                <div class="manager-input-section fade-in">
-                    <h4 class="mb-3"><i class="bi bi-people"></i> Danh Sách Managers</h4>
-                    <div class="row">
-                        ${managers.map(manager => `
-                            <div class="col-lg-4 col-md-6 mb-3">
-                                <div class="manager-list-item">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <h6 class="mb-1">${manager.name}</h6>
-                                            <small class="text-muted">${manager.team_name}</small>
-                                            <div class="small text-muted mt-1">
-                                                ID: ${manager.id}
-                                                ${manager.last_updated ? `<br>Cập nhật: ${new Date(manager.last_updated).toLocaleString('vi-VN')}` : ''}
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <button class="btn btn-sm btn-outline-primary me-1" onclick="loadManagerStats(${manager.id})" title="Refresh">
-                                                <i class="bi bi-arrow-clockwise"></i>
-                                            </button>
-                                            <button class="btn btn-sm btn-outline-danger" onclick="removeManager(${manager.id})" title="Xóa">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        `).join('')}
+            // This function now just re-renders the list from the `managers` array.
+            // It's mainly used after adding a new manager dynamically.
+            const listContainer = container.querySelector('.row');
+            if (listContainer) {
+                // Simple re-render for now. A more advanced implementation
+                // would just append the new manager.
+                listContainer.innerHTML = managers.map(manager => `
+                    <div class="col-lg-4 col-md-6 mb-3" id="manager-list-item-${manager.id}">
+                        ${renderManagerListItem(manager)}
                     </div>
-                </div>
-            `;
+                `).join('');
+            } else {
+                // If the list was empty, we need to create the whole structure
+                location.reload(); // Simple solution: reload the page to get the new server-rendered list
+            }
         }
 
         function updateManagerCount() {
@@ -491,11 +449,10 @@
 
                 if (result.success) {
                     managers = managers.filter(m => m.id !== managerId);
-                    updateManagersList();
-                    saveManagersToStorage();
                     updateManagerCount();
                     
-                    // Remove manager stats display
+                    // Remove manager from the list and stats display
+                    document.getElementById(`manager-list-item-${managerId}`)?.remove();
                     const statsElement = document.getElementById(`manager-${managerId}-stats`);
                     if (statsElement) {
                         statsElement.remove();
@@ -520,18 +477,28 @@
             if (!confirm('Bạn có chắc muốn xóa tất cả managers?')) return;
             if (managers.length === 0) return;
 
-            // Clear client-side state immediately for better UX
-            managers = [];
-            localStorage.removeItem('fantasyManagerIds');
-            updateManagersList();
-            updateManagerCount();
-            document.getElementById('managerStatsContainer').innerHTML = '';
-            document.getElementById('comparisonSection').style.display = 'none';
-            document.getElementById('comparisonCharts').innerHTML = '';
-            showToast('Đã xóa tất cả managers', 'success');
+            showLoading();
+            try {
+                const response = await fetch('/api/clear-all-managers', { method: 'POST' });
+                const result = await response.json();
+                hideLoading();
 
-            // Note: This assumes the backend session is temporary or non-existent.
-            // If the backend had persistent storage, you'd need an API call here.
+                if (result.success) {
+                    // Clear client-side state
+                    managers = [];
+                    updateManagerCount();
+                    document.getElementById('managersList').innerHTML = '';
+                    document.getElementById('managerStatsContainer').innerHTML = '';
+                    document.getElementById('comparisonSection').style.display = 'none';
+                    document.getElementById('comparisonCharts').innerHTML = '';
+                    showToast('Đã xóa tất cả managers', 'success');
+                } else {
+                    showToast(result.error, 'error');
+                }
+            } catch (error) {
+                hideLoading();
+                showToast('Lỗi khi xóa managers: ' + error.message, 'error');
+            }
         }
 
         async function fetchManagerStatsData(managerId) {
@@ -1246,6 +1213,30 @@
             }
             
             showToast('Đã refresh tất cả dữ liệu!', 'success');
+        }
+
+        // Helper function to render a single manager item, used for dynamic adding.
+        function renderManagerListItem(manager) {
+            return `
+                <div class="manager-list-item">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1">${manager.name}</h6>
+                            <small class="text-muted">${manager.team_name}</small>
+                            <div class="small text-muted mt-1">
+                                ID: ${manager.id}
+                            </div>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-outline-primary me-1" onclick="loadManagerStats(${manager.id})" title="Refresh">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="removeManager(${manager.id})" title="Xóa">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>`;
         }
 
         // Auto refresh every 5 minutes
