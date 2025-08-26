@@ -33,24 +33,45 @@ def add_manager(request):
     if request.method == 'POST':
         try:
             body = json.loads(request.body)
-            manager_id = body.get('manager_id')
-            if not manager_id:
-                return JsonResponse({"success": False, "error": "Manager ID is required."}, status=400)
+            manager_ids = body.get('manager_ids')
+            if not manager_ids or not isinstance(manager_ids, list):
+                return JsonResponse({"success": False, "error": "A list of Manager IDs is required."}, status=400)
 
-            response = requests.get(FPL_API_URL_ENTRY.format(manager_id))
-            response.raise_for_status()
-            data = response.json()
+            added_managers = []
+            failed_ids = []
 
-            manager_data = {
-                "id": data['id'],
-                "name": f"{data['player_first_name']} {data['player_last_name']}",
-                "team_name": data['name'],
-            }
-            return JsonResponse({"success": True, "manager": manager_data})
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 404:
-                return JsonResponse({"success": False, "error": f"Manager ID {manager_id} không tồn tại."}, status=404)
-            return JsonResponse({"success": False, "error": f"Lỗi FPL API: {e}"}, status=502)
+            for manager_id in manager_ids:
+                try:
+                    # Basic validation to ensure it's a digit-based ID
+                    if not str(manager_id).isdigit():
+                        failed_ids.append({"id": manager_id, "reason": "ID không hợp lệ"})
+                        continue
+
+                    response = requests.get(FPL_API_URL_ENTRY.format(manager_id))
+                    response.raise_for_status()
+                    data = response.json()
+
+                    manager_data = {
+                        "id": data['id'],
+                        "name": f"{data['player_first_name']} {data['player_last_name']}",
+                        "team_name": data['name'],
+                    }
+                    added_managers.append(manager_data)
+                except requests.exceptions.HTTPError as e:
+                    if e.response.status_code == 404:
+                        failed_ids.append({"id": manager_id, "reason": "Không tồn tại"})
+                    else:
+                        failed_ids.append({"id": manager_id, "reason": "Lỗi API"})
+                except Exception:
+                    failed_ids.append({"id": manager_id, "reason": "Lỗi không xác định"})
+
+            return JsonResponse({
+                "success": True,
+                "managers": added_managers,
+                "failed": failed_ids
+            })
+        except json.JSONDecodeError:
+            return JsonResponse({"success": False, "error": "Invalid JSON format."}, status=400)
         except Exception as e:
             return JsonResponse({"success": False, "error": str(e)}, status=500)
     return JsonResponse({"success": False, "error": "Invalid request method"}, status=405)
@@ -115,4 +136,3 @@ def compare_managers(request):
 def remove_manager(request, manager_id):
     # This is now a placeholder, as the actual removal happens on the client-side.
     return JsonResponse({"success": True, "message": f"Manager {manager_id} removal acknowledged."})
-

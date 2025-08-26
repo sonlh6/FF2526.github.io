@@ -210,11 +210,17 @@
             
             <div class="row">
                 <div class="col-lg-6">
-                    <div class="input-group">
-                        <input type="number" class="form-control" id="managerIdInput" 
-                               placeholder="Nhập Manager ID (VD: 1234567)" min="1">
-                        <button class="btn btn-gradient" onclick="addManager()">
-                            <i class="bi bi-plus-circle"></i> Thêm Manager
+                    <div class="manager-input-section mb-3">
+                        <div class="mb-3">
+                            <label for="managerIdsTextarea" class="form-label">Nhập Manager IDs (cách nhau bởi dấu phẩy, dấu cách, hoặc xuống dòng)</label>
+                            <textarea class="form-control" id="managerIdsTextarea" rows="3" placeholder="Ví dụ: 123, 456, 789"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="managerIdFile" class="form-label">Hoặc tải lên từ file (.txt)</label>
+                            <input class="form-control" type="file" id="managerIdFile" accept=".txt">
+                        </div>
+                        <button class="btn btn-primary w-100" type="button" onclick="processInputsAndAddManagers()">
+                            <i class="bi bi-plus-circle"></i> Thêm Tất Cả Managers
                         </button>
                     </div>
                     <small class="text-muted mt-2 d-block">
@@ -818,7 +824,95 @@
                 showToast('Lỗi so sánh: ' + error.message, 'error');
             }
         }
+        async function processInputsAndAddManagers() {
+            const textarea = document.getElementById('managerIdsTextarea');
+            const fileInput = document.getElementById('managerIdFile');
 
+            let idsFromText = parseIdsFromString(textarea.value);
+            let idsFromFile = [];
+
+            if (fileInput.files.length > 0) {
+                try {
+                    idsFromFile = await parseIdsFromFile(fileInput.files[0]);
+                } catch (error) {
+                    showToast('Lỗi đọc file: ' + error.message, 'error');
+                    return;
+                }
+            }
+
+            // Kết hợp ID từ cả hai nguồn và loại bỏ các ID trùng lặp
+            const allIds = [...new Set([...idsFromText, ...idsFromFile])];
+            const uniqueIds = allIds.filter(id => id); // Lọc bỏ các chuỗi rỗng
+
+            if (uniqueIds.length === 0) {
+                showToast('Vui lòng nhập Manager ID hoặc chọn file.', 'warning');
+                return;
+            }
+
+            await addManagersInBulk(uniqueIds);
+
+            // Xóa nội dung các ô input sau khi xử lý
+            textarea.value = '';
+            fileInput.value = '';
+        }
+
+        // Hàm hỗ trợ để tách chuỗi thành mảng các ID
+        function parseIdsFromString(text) {
+            if (!text) return [];
+            // Tách chuỗi bằng dấu phẩy, dấu cách, hoặc ký tự xuống dòng
+            return text.split(/[\s,]+/).map(id => id.trim()).filter(id => id);
+        }
+
+        // Hàm hỗ trợ để đọc ID từ file .txt
+        function parseIdsFromFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const ids = parseIdsFromString(event.target.result);
+                    resolve(ids);
+                };
+                reader.onerror = (error) => reject(error);
+                reader.readAsText(file);
+            });
+        }
+
+        // Hàm gọi API backend để thêm hàng loạt manager
+        async function addManagersInBulk(ids) {
+            showLoading();
+            try {
+                const response = await fetch('/api/add-manager', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ manager_ids: ids })
+                });
+
+                const result = await response.json();
+                hideLoading();
+
+                if (response.ok && result.success) {
+                    // Thêm các manager thành công vào danh sách và giao diện
+                    result.managers.forEach(manager => {
+                        addManagerToList(manager); // Giả sử bạn đã có hàm này
+                    });
+
+                    let successCount = result.managers.length;
+                    let failCount = result.failed.length;
+
+                    if (successCount > 0) {
+                        showToast(`Đã thêm thành công ${successCount} manager.`, 'success');
+                    }
+                    if (failCount > 0) {
+                        const failedIdsList = result.failed.map(f => `${f.id} (${f.reason})`).join(', ');
+                        showToast(`Thêm thất bại ${failCount} manager: ${failedIdsList}`, 'error', 10000); // Hiển thị thông báo lỗi trong 10 giây
+                    }
+                } else {
+                    showToast(result.error || 'Đã có lỗi xảy ra.', 'error');
+                }
+            } catch (error) {
+                hideLoading();
+                showToast('Lỗi kết nối: ' + error.message, 'error');
+            }
+        }    
         function renderRankingTable() {
             const tbody = document.getElementById('rankingTableBody');
             if (!tbody) return;
