@@ -59,6 +59,22 @@ DATABASES = {
     }
 }
 
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [BASE_DIR / "templates"],   # ✅ chỉ đến thư mục templates
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
+]
+
 # Nếu có biến DATABASE_URL (do Heroku cung cấp), hãy sử dụng nó
 db_from_env = dj_database_url.config(conn_max_age=600, ssl_require=True)
 if db_from_env:
