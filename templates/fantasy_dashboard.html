@@ -314,7 +314,7 @@
 
             managers.push(manager);
             saveManagersToStorage();
-            loadManagerStats(manager.id);
+            loadManagerStats(manager.id, false);
 
             if (managers.length > 0) {
                 document.getElementById('comparisonSection').style.display = 'block';
@@ -836,19 +836,7 @@
 
             container.innerHTML = `
                 <div class="row">
-                    <div class="col-lg-8">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5 class="mb-0"><i class="bi bi-graph-up"></i> So Sánh Điểm Theo Gameweek</h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="chart-container" style="height: 450px;">
-                                    <canvas id="comparisonChart"></canvas>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-lg-4">
+                    <div class="col-lg-7">
                         <div class="card">
                             <div class="card-header p-0">
                                 <ul class="nav nav-tabs card-header-tabs" id="rankingTab" role="tablist">
@@ -916,6 +904,18 @@
                                             </table>
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-5">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="bi bi-graph-up"></i> So Sánh Điểm Theo Gameweek</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container" style="height: 450px;">
+                                    <canvas id="comparisonChart"></canvas>
                                 </div>
                             </div>
                         </div>
@@ -1106,6 +1106,12 @@
                 managers = storedManagers;
                 document.getElementById('comparisonSection').style.display = 'block';
                 await compareAllManagers();
+
+                console.log("Đang tải thông tin chi tiết của từng manager trong nền.");
+                for (const manager of managers) {
+                    // Tải thông tin chi tiết mà không hiển thị màn hình chờ toàn trang
+                    loadManagerStats(manager.id, false);
+                }
             } else {
                 console.log("Đang tải danh sách managers mới do có sự thay đổi hoặc bộ nhớ trống.");
                 showLoading();
