@@ -94,14 +94,6 @@
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
         }
 
-        .comparison-section {
-            background: white;
-            border-radius: 20px;
-            padding: 30px;
-            margin-bottom: 30px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-        }
-
         .loading-overlay {
             position: fixed;
             top: 0;
@@ -174,6 +166,7 @@
         }
         th.sort-asc::after { content: ' \25B2'; } /* up triangle */
         th.sort-desc::after { content: ' \25BC'; } /* down triangle */
+        .bg-bronze { background-color: #cd7f32 !important; color: white; }
         .text-bronze { color: #cd7f32 !important; }
     </style>
 </head>
@@ -204,6 +197,24 @@
     </nav>
 
     <div class="container-fluid mt-4">
+        <!-- Comparison Section -->
+        <div class="card mb-4 fade-in" id="comparisonSection" style="display: none;">
+            <div class="card-header" style="background: var(--primary-gradient);">
+                <h3 class="mb-0 text-white"><i class="bi bi-trophy-fill"></i> Bảng Xếp Hạng & So Sánh</h3>
+            </div>
+            <div class="card-body p-4">
+                <div class="mb-4">
+                    <button class="btn btn-gradient" onclick="compareAllManagers()">
+                        <i class="bi bi-graph-up"></i> Cập nhật Bảng Xếp Hạng
+                    </button>
+                    <button class="btn btn-success ms-2" onclick="exportToExcel()">
+                        <i class="bi bi-file-earmark-excel"></i> Xuất Excel
+                    </button>
+                </div>
+                <div id="comparisonCharts"></div>
+            </div>
+        </div>
+
         <!-- Manager Input Section -->
         <div class="manager-input-section fade-in">
             <h3 class="mb-4"><i class="bi bi-person-plus"></i> Thêm Manager để Theo Dõi</h3>
@@ -255,22 +266,6 @@
                 </div>
             </div>
             {% endif %}
-        </div>
-
-        <!-- Comparison Section -->
-        <div class="comparison-section" id="comparisonSection" style="display: none;">
-            <h3 class="mb-4"><i class="bi bi-bar-chart"></i> So Sánh Managers</h3>
-            
-            <div class="mb-3">
-                <button class="btn btn-gradient" onclick="compareAllManagers()">
-                    <i class="bi bi-graph-up"></i> So Sánh Tất Cả
-                </button>
-                <button class="btn btn-success ms-2" onclick="exportToExcel()">
-                    <i class="bi bi-file-earmark-excel"></i> Xuất Excel
-                </button>
-            </div>
-
-            <div id="comparisonCharts"></div>
         </div>
 
         <!-- Individual Manager Stats -->
@@ -868,8 +863,8 @@
                     <tr>
                         <td>
                             <span class="badge ${index === 0 ? 'bg-warning' :
-                                               index === 1 ? 'bg-secondary' :
-                                               index === 2 ? 'bg-info' : 'bg-light text-dark'}">${index + 1}</span>
+                                               index === 1 ? 'bg-info' :
+                                               index === 2 ? 'bg-bronze' : 'bg-light text-dark'}">${index + 1}</span>
                         </td>
                         <td class="small">${manager.team_name}</td>
                         <td class="${getHighlightClass(manager.total_points, 'total_points')}">${manager.total_points}</td>
@@ -909,8 +904,8 @@
             }
             
             // Silver (only for specific columns)
-            if (scores.length > 1 && value === scores[1] && ['total_points', 'firstHalfPoints', 'secondHalfPoints'].includes(key)) {
-                return 'text-secondary fw-bold';
+            if (scores.length > 1 && value === scores[1] && ['total_points', 'firstHalfPoints', 'secondHalfPoints'].includes(key)) { 
+                return 'text-info fw-bold';
             }
             
             // Bronze (only for total_points)
@@ -960,6 +955,9 @@
                     .filter(gw => gw.gameweek >= 20 && gw.gameweek <= 38)
                     .reduce((sum, gw) => sum + gw.points, 0);
 
+                // Recalculate total points to ensure accuracy, instead of relying on the API's potentially stale value.
+                const totalPointsCalculated = firstHalfPoints + secondHalfPoints;
+
                 // New logic for the record holder column
                 const managerRecords = recordHoldersInfo.filter(rh => rh.managerId === manager.id);
                 const isRecordHolder = managerRecords.length > 0;
@@ -979,6 +977,7 @@
 
                 return {
                     ...manager,
+                    total_points: totalPointsCalculated,
                     firstHalfPoints,
                     secondHalfPoints,
                     recordDisplay,
