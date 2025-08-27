@@ -215,59 +215,6 @@
             </div>
         </div>
 
-        <!-- Manager Input Section -->
-        <div class="manager-input-section fade-in">
-            <h3 class="mb-4"><i class="bi bi-person-plus"></i> Thêm Manager để Theo Dõi</h3>
-            
-            <div class="row">
-                <div class="col-lg-6">
-                    <div class="manager-input-section mb-3">
-                        <div class="mb-3">
-                            <label for="managerIdsTextarea" class="form-label">Nhập Manager IDs (cách nhau bởi dấu phẩy, dấu cách, hoặc xuống dòng)</label>
-                            <textarea class="form-control" id="managerIdsTextarea" rows="3" placeholder="Ví dụ: 123, 456, 789"></textarea>
-                        </div>
-                        <div class="mb-3">
-                            <label for="managerIdFile" class="form-label">Hoặc tải lên từ file (.txt)</label>
-                            <input class="form-control" type="file" id="managerIdFile" accept=".txt">
-                        </div>
-                        <button class="btn btn-primary w-100" type="button" onclick="processInputsAndAddManagers()">
-                            <i class="bi bi-plus-circle"></i> Thêm Tất Cả Managers
-                        </button>
-                    </div>
-                    <small class="text-muted mt-2 d-block">
-                        <i class="bi bi-info-circle"></i> Tìm Manager ID trong URL của trang Fantasy Premier League
-                    </small>
-                </div>
-                
-                <div class="col-lg-6">
-                    <div class="d-flex align-items-center h-100">
-                        <div class="me-3">
-                            <strong>Managers đã thêm:</strong> <span id="managerCount" class="badge bg-primary">0</span>
-                        </div>
-                        <button class="btn btn-outline-danger btn-sm" onclick="clearAllManagers()">
-                            <i class="bi bi-trash"></i> Xóa tất cả
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Manager List -->
-        <div id="managersList" class="mb-4">
-            {% if managers %}
-            <div class="manager-input-section fade-in">
-                <h4 class="mb-3"><i class="bi bi-people"></i> Danh Sách Managers</h4>
-                <div class="row">
-                    {% for manager in managers %}
-                    <div class="col-lg-4 col-md-6 mb-3" id="manager-list-item-{{ manager.id }}">
-                        {% include 'partials/manager_list_item.html' with manager=manager %}
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-            {% endif %}
-        </div>
-
         <!-- Individual Manager Stats -->
         <div id="managerStatsContainer"></div>
     </div>
@@ -309,8 +256,7 @@
         // Initialize app
         document.addEventListener('DOMContentLoaded', function() {
             checkConnection();
-            // Load managers from client-side storage on startup
-            loadInitialManagers();
+            initializeDashboard();
         });
 
         function saveManagersToStorage() {
@@ -367,119 +313,12 @@
             }
 
             managers.push(manager);
-            updateManagersList();
             saveManagersToStorage();
             loadManagerStats(manager.id);
-            updateManagerCount();
 
             if (managers.length > 0) {
                 document.getElementById('comparisonSection').style.display = 'block';
             }
-        }
-
-        async function loadInitialManagers() {
-            const storedManagersJSON = localStorage.getItem('fantasyManagers');
-            if (storedManagersJSON) {
-                managers = JSON.parse(storedManagersJSON);
-                if (managers.length > 0) {
-                    updateManagersList();
-                    updateManagerCount();
-                    document.getElementById('comparisonSection').style.display = 'block';
-                }
-            }
-        }
-
-        function updateManagersList() {
-            const container = document.getElementById('managersList');
-            
-            if (managers.length === 0) {
-                container.innerHTML = '';
-                return;
-            }
-
-            container.innerHTML = `
-                <div class="manager-input-section fade-in">
-                    <h4 class="mb-3"><i class="bi bi-people"></i> Danh Sách Managers</h4>
-                    <div class="row">
-                        ${managers.map(manager => `
-                            <div class="col-lg-4 col-md-6 mb-3">
-                                <div class="manager-list-item">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <h6 class="mb-1">${manager.name}</h6>
-                                            <small class="text-muted">${manager.team_name}</small>
-                                            <div class="small text-muted mt-1">
-                                                ID: ${manager.id}
-                                                ${manager.last_updated ? `<br>Cập nhật: ${new Date(manager.last_updated).toLocaleString('vi-VN')}` : ''}
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <button class="btn btn-sm btn-outline-primary me-1" onclick="loadManagerStats(${manager.id})" title="Refresh">
-                                                <i class="bi bi-arrow-clockwise"></i>
-                                            </button>
-                                            <button class="btn btn-sm btn-outline-danger" onclick="removeManager(${manager.id})" title="Xóa">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            `;
-        }
-
-        function updateManagerCount() {
-            document.getElementById('managerCount').textContent = managers.length;
-        }
-
-        async function removeManager(managerId) {
-            if (!confirm('Bạn có chắc muốn xóa manager này?')) return;
-
-            try {
-                const response = await fetch(`/api/remove-manager/${managerId}`, { method: 'DELETE' });
-                const result = await response.json();
-
-                if (result.success) {
-                    managers = managers.filter(m => m.id !== managerId);
-                    updateManagersList();
-                    saveManagersToStorage();
-                    updateManagerCount();
-                    
-                    // Remove manager stats display
-                    const statsElement = document.getElementById(`manager-${managerId}-stats`);
-                    if (statsElement) {
-                        statsElement.remove();
-                    }
-                    
-                    // Hide comparison if no managers
-                    if (managers.length === 0) {
-                        document.getElementById('comparisonSection').style.display = 'none';
-                        document.getElementById('comparisonCharts').innerHTML = '';
-                    }
-                    
-                    showToast('Đã xóa manager', 'success');
-                } else {
-                    showToast(result.error, 'error');
-                }
-            } catch (error) {
-                showToast('Lỗi xóa manager: ' + error.message, 'error');
-            }
-        }
-
-        async function clearAllManagers() {
-            if (!confirm('Bạn có chắc muốn xóa tất cả managers?')) return;
-            if (managers.length === 0) return;
-
-            managers = [];
-            localStorage.removeItem('fantasyManagers');
-            updateManagersList();
-            updateManagerCount();
-            document.getElementById('managerStatsContainer').innerHTML = '';
-            document.getElementById('comparisonSection').style.display = 'none';
-            document.getElementById('comparisonCharts').innerHTML = '';
-            showToast('Đã xóa tất cả managers', 'success');
         }
 
         async function fetchManagerStatsData(managerId) {
@@ -738,57 +577,6 @@
                 hideLoading();
                 showToast('Lỗi so sánh: ' + error.message, 'error');
             }
-        }
-        async function processInputsAndAddManagers() {
-            const textarea = document.getElementById('managerIdsTextarea');
-            const fileInput = document.getElementById('managerIdFile');
-
-            let idsFromText = parseIdsFromString(textarea.value);
-            let idsFromFile = [];
-
-            if (fileInput.files.length > 0) {
-                try {
-                    idsFromFile = await parseIdsFromFile(fileInput.files[0]);
-                } catch (error) {
-                    showToast('Lỗi đọc file: ' + error.message, 'error');
-                    return;
-                }
-            }
-
-            // Kết hợp ID từ cả hai nguồn và loại bỏ các ID trùng lặp
-            const allIds = [...new Set([...idsFromText, ...idsFromFile])];
-            const uniqueIds = allIds.filter(id => id); // Lọc bỏ các chuỗi rỗng
-
-            if (uniqueIds.length === 0) {
-                showToast('Vui lòng nhập Manager ID hoặc chọn file.', 'warning');
-                return;
-            }
-
-            await addManagersInBulk(uniqueIds);
-
-            // Xóa nội dung các ô input sau khi xử lý
-            textarea.value = '';
-            fileInput.value = '';
-        }
-
-        // Hàm hỗ trợ để tách chuỗi thành mảng các ID
-        function parseIdsFromString(text) {
-            if (!text) return [];
-            // Tách chuỗi bằng dấu phẩy, dấu cách, hoặc ký tự xuống dòng
-            return text.split(/[\s,]+/).map(id => id.trim()).filter(id => id);
-        }
-
-        // Hàm hỗ trợ để đọc ID từ file .txt
-        function parseIdsFromFile(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const ids = parseIdsFromString(event.target.result);
-                    resolve(ids);
-                };
-                reader.onerror = (error) => reject(error);
-                reader.readAsText(file);
-            });
         }
 
         // Hàm gọi API backend để thêm hàng loạt manager
@@ -1284,10 +1072,10 @@
             
             await checkConnection();
             
-            for (const manager of managers) {
-                await loadManagerStats(manager.id);
-            }
-            
+            // Đã được comment để tăng tốc độ refresh, tập trung vào bảng so sánh chính.
+            // for (const manager of managers) {
+            //     await loadManagerStats(manager.id, false);
+            // }
             if (managers.length >= 2) {
                 await compareAllManagers();
             }
@@ -1295,6 +1083,41 @@
             showToast('Đã refresh tất cả dữ liệu!', 'success');
         }
 
+        async function initializeDashboard() {
+            const hardcodedIds = [6219866,3596241,2783491,1450718,4464438,2940974,8041659,346286,4359883,2985317,5458822,3109862,3370481,2982855];
+            const storedManagersJSON = localStorage.getItem('fantasyManagers');
+            let storedManagers = [];
+
+            if (storedManagersJSON) {
+                try {
+                    storedManagers = JSON.parse(storedManagersJSON);
+                } catch (e) {
+                    console.error("Lỗi phân tích dữ liệu managers:", e);
+                    storedManagers = [];
+                }
+            }
+
+            const storedIds = storedManagers.map(m => m.id).sort((a, b) => a - b);
+            const hardcodedSortedIds = [...hardcodedIds].sort((a, b) => a - b);
+            const isListTheSame = storedIds.length === hardcodedSortedIds.length && storedIds.every((value, index) => value === hardcodedSortedIds[index]);
+
+            if (isListTheSame && storedManagers.length > 0) {
+                console.log("Đang tải danh sách managers từ bộ nhớ cục bộ.");
+                managers = storedManagers;
+                document.getElementById('comparisonSection').style.display = 'block';
+                await compareAllManagers();
+            } else {
+                console.log("Đang tải danh sách managers mới do có sự thay đổi hoặc bộ nhớ trống.");
+                showLoading();
+                managers = [];
+                localStorage.removeItem('fantasyManagers');
+                await addManagersInBulk(hardcodedIds);
+                if (managers.length > 0) {
+                    await compareAllManagers();
+                }
+                hideLoading();
+            }
+        }
         // Auto refresh every 5 minutes
         setInterval(refreshAllData, 300000);
     </script>
