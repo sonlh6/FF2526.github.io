@@ -16,7 +16,7 @@ DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 # Thêm tên miền Heroku của bạn vào đây sau khi tạo app
 # Ví dụ: ALLOWED_HOSTS = ['ten-app-cua-ban.herokuapp.com', '127.0.0.1']
-ALLOWED_HOSTS = ['ffst-f49f926a4e62.herokuapp.com', '127.0.0.1']
+ALLOWED_HOSTS = ['ff-du1s.onrender.com', '127.0.0.1']
 
 
 # Application definition
@@ -47,6 +47,7 @@ MIDDLEWARE = [
 STATIC_URL = '/static/'
 # Nơi Django sẽ thu thập tất cả các file tĩnh để whitenoise phục vụ
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Cấu hình Database
