@@ -16,7 +16,7 @@ DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 # Thêm tên miền Heroku của bạn vào đây sau khi tạo app
 # Ví dụ: ALLOWED_HOSTS = ['ten-app-cua-ban.herokuapp.com', '127.0.0.1']
-ALLOWED_HOSTS = ['ff-du1s.onrender.com', '127.0.0.1']
+ALLOWED_HOSTS = ['fifa2526.onrender.com', '127.0.0.1']
 
 
 # Application definition
