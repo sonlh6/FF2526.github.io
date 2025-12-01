@@ -236,21 +236,15 @@
 
     <script>
         // Initialize managers array from data passed by Django
-        let managers = [
-            {% for manager in managers %}
-                {
-                    id: {{ manager.id }},
-                    name: "{{ manager.name|escapejs }}",
-                    team_name: "{{ manager.team_name|escapejs }}"
-                },
-            {% endfor %}
-        ];
+        let managers = {{ managers|tojson|safe }};
         let charts = {};
         let processedComparisonData = [];
         let reversedWeeklyScores = [];
         let currentSort = { key: 'total_points', dir: 'desc' };
         let topScores = {};
         let rankMap = new Map();
+        let currentGameweek = null;
+        let currentGwFinished = true;
 
 
         // Initialize app
@@ -320,7 +314,56 @@
                 document.getElementById('comparisonSection').style.display = 'block';
             }
         }
+        function fetchLiveScores() {
+            fetch('/api/live-scores')
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        console.log(`Live scores for GW ${result.gameweek}:`, result.data);
+                        
+                        // Lặp qua danh sách điểm live và cập nhật UI
+                        result.data.forEach(score => {
+                            // Giả sử bạn có một element để hiển thị tổng điểm,
+                            // và bạn muốn thêm điểm live bên cạnh nó.
+                            // Ví dụ: <span id="total-points-6219866">...</span>
+                            // và bạn sẽ thêm một span mới cho điểm live.
+                            const managerCard = document.getElementById(`manager-card-${score.manager_id}`);
+                            if (managerCard) {
+                                let liveScoreEl = managerCard.querySelector('.live-score');
+                                if (!liveScoreEl) {
+                                    liveScoreEl = document.createElement('span');
+                                    liveScoreEl.className = 'live-score';
+                                    // Chèn vào vị trí phù hợp trong card
+                                    const titleEl = managerCard.querySelector('h5');
+                                    if (titleEl) {
+                                        titleEl.appendChild(liveScoreEl);
+                                    }
+                                }
 
+                                if (score.live_points !== null) {
+                                    liveScoreEl.textContent = ` (Live: ${score.live_points} pts)`;
+                                    liveScoreEl.style.color = 'green';
+                                } else {
+                                    liveScoreEl.textContent = ` (Live: Lỗi)`;
+                                    liveScoreEl.style.color = 'red';
+                                }
+                            }
+                        });
+                    } else {
+                        console.error('Không thể lấy điểm live:', result.error);
+                    }
+                })
+                .catch(error => console.error('Lỗi mạng khi lấy điểm live:', error));
+        }
+
+        // Bắt đầu gọi hàm khi trang được tải
+        document.addEventListener('DOMContentLoaded', () => {
+            // Gọi lần đầu
+            fetchLiveScores();
+            
+            // Tự động cập nhật mỗi 60 giây
+            setInterval(fetchLiveScores, 60000);
+        });    
         async function fetchManagerStatsData(managerId) {
             try {
                 const response = await fetch(`/api/manager/${managerId}/stats`);
@@ -358,18 +401,70 @@
         function displayManagerStats(managerId, stats) {
             const container = document.getElementById('managerStatsContainer');
             
-            // Remove existing stats for this manager
+            // Xóa block cũ (nếu có)
             const existing = document.getElementById(`manager-${managerId}-stats`);
             if (existing) existing.remove();
 
+            // --- Lấy dữ liệu gốc và chèn điểm live GW hiện tại (nếu có) ---
+            const originalGw = Array.isArray(stats.gameweek_points) ? stats.gameweek_points : [];
+            let gwPoints = [...originalGw].sort((a, b) => a.gameweek - b.gameweek);
+
+            // Nếu đang có GW live và backend đã trả live_total_points > total_points
+            if (currentGameweek && !currentGwFinished) {
+                const hasLive =
+                    typeof stats.live_total_points === 'number' &&
+                    typeof stats.total_points === 'number' &&
+                    stats.live_total_points > stats.total_points;
+
+                if (hasLive) {
+                    const livePoints = stats.live_total_points - stats.total_points;
+
+                    const idx = gwPoints.findIndex(g => g.gameweek === currentGameweek);
+                    // Tổng trước GW live (dựa theo total_points của GW trước)
+                    const prevTotal =
+                        gwPoints.length > 0
+                            ? (gwPoints.find(g => g.gameweek < currentGameweek)?.total_points ??
+                            gwPoints[gwPoints.length - 1].total_points ?? 0)
+                            : 0;
+
+                    if (idx !== -1) {
+                        // Nếu đã có entry GW hiện tại thì cập nhật
+                        gwPoints[idx] = {
+                            ...gwPoints[idx],
+                            points: livePoints,
+                            total_points: prevTotal + livePoints
+                        };
+                    } else {
+                        // Nếu chưa có entry thì thêm mới
+                        gwPoints.push({
+                            gameweek: currentGameweek,
+                            points: livePoints,
+                            total_points: prevTotal + livePoints
+                        });
+                    }
+                    gwPoints.sort((a, b) => a.gameweek - b.gameweek);
+                }
+            }
+
+            // Chuẩn bị dữ liệu cho chart
+            const labels = gwPoints.map(gw => `GW${gw.gameweek}`);
+            const pointsData = gwPoints.map(gw => gw.points);
+
+            // Tổng điểm tích lũy: ưu tiên dùng total_points nếu có; nếu không thì cộng dồn
+            let running = 0;
+            const totalPointsData = gwPoints.map(gw => {
+                if (typeof gw.total_points === 'number') {
+                    running = gw.total_points;
+                } else {
+                    running += (gw.points || 0);
+                }
+                return running;
+            });
+
+            // --- Render thẻ manager ---
             const managerCard = document.createElement('div');
             managerCard.id = `manager-${managerId}-stats`;
             managerCard.className = 'manager-card card fade-in mb-4';
-
-            const gameweekPoints = stats.gameweek_points || [];
-            const pointsData = gameweekPoints.map(gw => gw.points);
-            const labels = gameweekPoints.map(gw => `GW${gw.gameweek}`);
-            const totalPointsData = gameweekPoints.map(gw => gw.total_points);
 
             managerCard.innerHTML = `
                 <div class="card-header">
@@ -379,7 +474,7 @@
                             <small>${stats.manager_info.name}</small>
                         </div>
                         <div class="text-end">
-                            <div class="h4 mb-0">${stats.total_points}</div>
+                            <div class="h4 mb-0">${stats.live_total_points ?? stats.total_points}</div>
                             <small>Total Points</small>
                         </div>
                     </div>
@@ -417,9 +512,9 @@
                     <div class="mb-4">
                         <h6 class="mb-3">Điểm theo từng Gameweek:</h6>
                         <div>
-                            ${gameweekPoints.map(gw => {
+                            ${gwPoints.map(gw => {
                                 const pointClass = gw.points >= 70 ? 'point-high' : 
-                                                 gw.points >= 45 ? 'point-medium' : 'point-low';
+                                                gw.points >= 45 ? 'point-medium' : 'point-low';
                                 return `<span class="gw-point-badge ${pointClass}" title="GW${gw.gameweek}: ${gw.points} điểm">
                                     GW${gw.gameweek}: ${gw.points}
                                 </span>`;
@@ -461,17 +556,21 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    ${gameweekPoints.map(gw => `
+                                    ${gwPoints.map(gw => `
                                         <tr>
                                             <td><strong>GW${gw.gameweek}</strong></td>
                                             <td><span class="badge ${gw.points >= 70 ? 'bg-success' : 
-                                                                   gw.points >= 45 ? 'bg-warning' : 'bg-danger'}">${gw.points}</span></td>
-                                            <td>${gw.total_points?.toLocaleString() || 'N/A'}</td>
+                                                                gw.points >= 45 ? 'bg-warning' : 'bg-danger'}">${gw.points}</span></td>
+                                            <td>${(typeof gw.total_points === 'number') ? gw.total_points.toLocaleString() : 'N/A'}</td>
                                             <td>${gw.rank?.toLocaleString() || 'N/A'}</td>
-                                            <td>£${gw.bank}M</td>
-                                            <td>£${gw.value}M</td>
-                                            <td>${gw.event_transfers} (-${gw.event_transfers_cost})</td>
-                                            <td>${gw.points_on_bench}</td>
+                                            <td>${gw.bank !== undefined ? `£${gw.bank}M` : 'N/A'}</td>
+                                            <td>${gw.value !== undefined ? `£${gw.value}M` : 'N/A'}</td>
+                                            <td>${
+                                                gw.event_transfers !== undefined
+                                                    ? `${gw.event_transfers}${gw.event_transfers_cost !== undefined ? ` (-${gw.event_transfers_cost})` : ''}`
+                                                    : 'N/A'
+                                            }</td>
+                                            <td>${gw.points_on_bench ?? 'N/A'}</td>
                                         </tr>
                                     `).join('')}
                                 </tbody>
@@ -483,11 +582,13 @@
 
             container.appendChild(managerCard);
 
-            // Create charts
+            // Vẽ chart dựa trên dữ liệu đã chèn GW live
             setTimeout(() => {
                 createManagerCharts(managerId, labels, pointsData, totalPointsData);
             }, 100);
         }
+
+
 
         function createManagerCharts(managerId, labels, pointsData, totalPointsData) {
             // Points per gameweek chart
@@ -569,6 +670,11 @@
                 hideLoading();
 
                 if (result.success) {
+                    // lưu lại thông tin vòng hiện tại từ backend
+                    currentGameweek = result.current_gameweek;
+                    currentGwFinished = result.current_gw_finished;
+
+                    // vẽ lại bảng so sánh
                     displayComparison(result.data);
                 } else {
                     showToast(result.error, 'error');
@@ -632,7 +738,7 @@
 
             // Special case for rank: it's always based on total_points descending
             if (sortKey === 'rank') {
-                processedComparisonData.sort((a, b) => b.total_points - a.total_points);
+                processedComparisonData.sort((a, b) => (b.total_points ?? 0) - (a.total_points ?? 0));
             } else {
                 processedComparisonData.sort((a, b) => {
                     const valA = a[sortKey];
@@ -655,7 +761,7 @@
                                                index === 2 ? 'bg-bronze' : 'bg-light text-dark'}">${index + 1}</span>
                         </td>
                         <td class="small">${manager.team_name}</td>
-                        <td class="${getHighlightClass(manager.total_points, 'total_points')}">${manager.total_points}</td>
+                        <td class="${getHighlightClass(manager.total_points, 'total_points')}">${manager.total_points ?? 0}</td>
                         <td class="${getHighlightClass(manager.firstHalfPoints, 'firstHalfPoints')}">${manager.firstHalfPoints}</td>
                         <td class="${getHighlightClass(manager.secondHalfPoints, 'secondHalfPoints')}">${manager.secondHalfPoints}</td>
                         <td class="${getHighlightClass(manager.recordSortValue, 'recordSortValue')}">${manager.recordDisplay}</td>
@@ -735,6 +841,29 @@
                 });
             });
 
+            // If the current gameweek is live, calculate and inject the live points into the gameweeks array.
+            // This ensures all subsequent calculations are based on a single, complete source of truth.
+            if (currentGameweek && !currentGwFinished) {
+                data.managers.forEach(manager => {
+                    // Calculate live points from the difference between the live total and the last official total.
+                    // This is more robust than relying on a separate 'live_points' field.
+                    if (manager.live_total_points && manager.total_points && manager.live_total_points > manager.total_points) {
+                        const live_gw_points = manager.live_total_points - manager.total_points;
+
+                        // Find if an entry for the current GW already exists (e.g., from a partially updated API).
+                        let gwEntry = manager.gameweeks.find(gw => gw.gameweek === currentGameweek);
+                        if (gwEntry) {
+                            // Update existing entry with the calculated live points.
+                            gwEntry.points = live_gw_points;
+                        } else {
+                            // If no entry exists, add a new one for the current live gameweek.
+                            manager.gameweeks.push({ gameweek: currentGameweek, points: live_gw_points });
+                            manager.gameweeks.sort((a, b) => a.gameweek - b.gameweek);
+                        }
+                    }
+                });
+            }
+
             processedComparisonData = data.managers.map(manager => {
                 const firstHalfPoints = manager.gameweeks
                     .filter(gw => gw.gameweek >= 1 && gw.gameweek <= 19)
@@ -743,8 +872,10 @@
                     .filter(gw => gw.gameweek >= 20 && gw.gameweek <= 38)
                     .reduce((sum, gw) => sum + gw.points, 0);
 
-                // Recalculate total points to ensure accuracy, instead of relying on the API's potentially stale value.
-                const totalPointsCalculated = firstHalfPoints + secondHalfPoints;
+                // Use the live total points from the API if available, as it's the most direct and reliable source.
+                // Fall back to the calculated sum if live data isn't present.
+                // The `gameweeks` array has already been updated with live data, so `firstHalfPoints` and `secondHalfPoints` are correct for their columns.
+                const totalPointsFinal = manager.live_total_points ?? (firstHalfPoints + secondHalfPoints);
 
                 // New logic for the record holder column
                 const managerRecords = recordHoldersInfo.filter(rh => rh.managerId === manager.id);
@@ -765,8 +896,8 @@
 
                 return {
                     ...manager,
-                    total_points: totalPointsCalculated,
-                    firstHalfPoints,
+                    total_points: totalPointsFinal,
+                    firstHalfPoints, 
                     secondHalfPoints,
                     recordDisplay,
                     recordSortValue: isRecordHolder ? highestEverScore : 0,
@@ -878,7 +1009,7 @@
                                         </div>
                                     </div>
                                     <div class="tab-pane fade" id="weekly-scores" role="tabpanel" aria-labelledby="weekly-scores-tab">
-                                        <div class="table-responsive" style="max-height: 450px;">
+                                        <div class="table-responsive" style="max-height: 500px;">
                                             <table class="table table-sm table-striped table-bordered">
                                                 <thead class="table-dark sticky-top">
                                                     <tr>
@@ -895,6 +1026,10 @@
                                                             ${reversedWeeklyScores.map(row => {
                                                                 const score = row.scores[manager.id];
                                                                 const isHighest = row.highestScore !== null && score === row.highestScore && row.highestScore > 0;
+                                                                const isCurrent = row.gameweek === currentGameweek && !currentGwFinished;
+                                                                if (isCurrent) {
+                                                                    return `<td><span class="text-success fw-bold">${score}</span></td>`;
+                                                                }
                                                                 return isHighest
                                                                     ? `<td><strong class="text-warning">${score}</strong></td>`
                                                                     : `<td>${score}</td>`;
@@ -1073,9 +1208,9 @@
             await checkConnection();
             
             // Đã được comment để tăng tốc độ refresh, tập trung vào bảng so sánh chính.
-            // for (const manager of managers) {
-            //     await loadManagerStats(manager.id, false);
-            // }
+            for (const manager of managers) {
+                await loadManagerStats(manager.id, false);
+            }
             if (managers.length >= 2) {
                 await compareAllManagers();
             }
@@ -1084,7 +1219,7 @@
         }
 
         async function initializeDashboard() {
-            const hardcodedIds = [6219866,3596241,2783491,1450718,4464438,2940974,8041659,346286,4359883,2985317,5458822,3109862,3370481,2982855];
+            const hardcodedIds = [6219866,3596241,3109862,2783491,1450718,4464438,2940974,8041659,346286,4359883,2985317,5458822,3370481,2982855];
             const storedManagersJSON = localStorage.getItem('fantasyManagers');
             let storedManagers = [];
 

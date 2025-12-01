@@ -13,3 +13,4 @@ urlpatterns = [
     path('api/remove-manager/<int:manager_id>', views.remove_manager, name='api_remove_manager'),
 ]
 
+    
