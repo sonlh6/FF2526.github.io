@@ -3,13 +3,13 @@ from pathlib import Path
 import dj_database_url
 
 # Base directory
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent
 
 # Security
 SECRET_KEY = os.environ.get("SECRET_KEY", "local-secret")
 DEBUG = os.environ.get("DEBUG", "False") == "True"
 
-ALLOWED_HOSTS = ["fifa2526.onrender.com", "127.0.0.1", "localhost"]
+ALLOWED_HOSTS = [".onrender.com", "127.0.0.1", "localhost"]
 
 # Installed apps
 INSTALLED_APPS = [
@@ -71,9 +71,5 @@ if db_env:
 # Static files
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-
-STATICFILES_DIRS = [
-    BASE_DIR / "static",
-]
 
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
