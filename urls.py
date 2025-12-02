@@ -1,29 +1,16 @@
-from django.contrib import admin
-from django.urls import path, include
-from django.views.generic import TemplateView
-from django.conf import settings
-from django.conf.urls.static import static
-from api_views import (
-    dashboard_view,
-    test_connection,
-    add_manager,
-    get_manager_stats,
-    compare_managers,
-    remove_manager,
-)
+from django.urls import path
+import views
 
 urlpatterns = [
     # Frontend View
-    path('admin/', admin.site.urls),
-    path('', dashboard_view, name='home'),
+    path('', views.dashboard_view, name='dashboard'),
 
     # API Endpoints
-    path('api/test-connection', test_connection),
-    path('api/add-manager', add_manager),
-    path('api/manager/<int:manager_id>/stats', get_manager_stats),
-    path('api/compare-managers', compare_managers),
-    path('api/remove-manager/<int:manager_id>', remove_manager),
+    path('api/test-connection', views.test_connection, name='api_test_connection'),
+    path('api/add-manager', views.add_manager, name='api_add_manager'),
+    path('api/manager/<int:manager_id>/stats', views.get_manager_stats, name='api_get_manager_stats'),
+    path('api/compare-managers', views.compare_managers, name='api_compare_managers'),
+    path('api/remove-manager/<int:manager_id>', views.remove_manager, name='api_remove_manager'),
 ]
 
-if settings.DEBUG:
-    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)    
+    

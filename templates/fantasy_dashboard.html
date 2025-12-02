@@ -236,20 +236,15 @@
 
     <script>
         // Initialize managers array from data passed by Django
-        {{ managers|json_script:"managers-data" }}
-
-        <script>
-                let managers = JSON.parse(document.getElementById('managers-data').textContent);
-
-                let charts = {};
-                let processedComparisonData = [];
-                let reversedWeeklyScores = [];
-                let currentSort = { key: 'total_points', dir: 'desc' };
-                let topScores = {};
-                let rankMap = new Map();
-                let currentGameweek = null;
-                let currentGwFinished = true;
-        </script>
+        let managers = {{ managers|tojson|safe }};
+        let charts = {};
+        let processedComparisonData = [];
+        let reversedWeeklyScores = [];
+        let currentSort = { key: 'total_points', dir: 'desc' };
+        let topScores = {};
+        let rankMap = new Map();
+        let currentGameweek = null;
+        let currentGwFinished = true;
 
 
         // Initialize app
