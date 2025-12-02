@@ -1,12 +1,9 @@
 from django.urls import path
-from django.contrib import admin
-from django.views.generic import TemplateView
 import views
 
 urlpatterns = [
     # Frontend View
-    path('admin/', admin.site.urls),
-    path('', TemplateView.as_view(template_name='fantasy_dashboard.html')),
+    path('', views.dashboard_view, name='dashboard'),
 
     # API Endpoints
     path('api/test-connection', views.test_connection, name='api_test_connection'),
