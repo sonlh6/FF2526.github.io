@@ -4,6 +4,7 @@ from django.views.generic import TemplateView
 from django.conf import settings
 from django.conf.urls.static import static
 from api_views import (
+    dashboard_view,
     test_connection,
     add_manager,
     get_manager_stats,
@@ -14,7 +15,7 @@ from api_views import (
 urlpatterns = [
     # Frontend View
     path('admin/', admin.site.urls),
-    path('', TemplateView.as_view(template_name='fantasy_dashboard.html'), name='home'),
+    path('', dashboard_view, name='home'),
 
     # API Endpoints
     path('api/test-connection', test_connection),
