@@ -875,7 +875,7 @@
                 // Use the live total points from the API if available, as it's the most direct and reliable source.
                 // Fall back to the calculated sum if live data isn't present.
                 // The `gameweeks` array has already been updated with live data, so `firstHalfPoints` and `secondHalfPoints` are correct for their columns.
-                const totalPointsFinal = manager.live_total_points ?? (firstHalfPoints + secondHalfPoints);
+                const totalPointsFinal = firstHalfPoints + secondHalfPoints;
 
                 // New logic for the record holder column
                 const managerRecords = recordHoldersInfo.filter(rh => rh.managerId === manager.id);
